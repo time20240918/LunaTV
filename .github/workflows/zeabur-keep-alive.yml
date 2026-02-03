@@ -1,0 +1,26 @@
+name: Zeabur Keep Alive
+
+on:
+  schedule:
+    # 每 15 天的凌晨 0 点运行一次 (UTC 时间)
+    - cron: '0 0 */15 * *'
+  workflow_dispatch: # 支持手动点击运行
+
+jobs:
+  active-account:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Update Heartbeat
+        run: |
+          echo "Last active: $(date)" > heartbeat.txt
+
+      - name: Commit and Push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add heartbeat.txt
+          git commit -m "chore: active zeabur deployment [skip ci]"
+          git push
