@@ -93,17 +93,28 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
       // 固定使用hls.js加载
       const hls = new Hls();
 
+      // 统一的资源释放，重复调用安全
+      let released = false;
+      const cleanup = () => {
+        if (released) return;
+        released = true;
+        try {
+          hls.destroy();
+        } catch (e) {
+          // ignore
+        }
+        video.remove();
+      };
+
       // 设置超时处理
       const timeout = setTimeout(() => {
-        hls.destroy();
-        video.remove();
+        cleanup();
         reject(new Error('Timeout loading video metadata'));
       }, 4000);
 
       video.onerror = () => {
         clearTimeout(timeout);
-        hls.destroy();
-        video.remove();
+        cleanup();
         reject(new Error('Failed to load video metadata'));
       };
 
@@ -121,10 +132,10 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
         ) {
           clearTimeout(timeout);
           const width = video.videoWidth;
+          // 无论能否取到尺寸，都必须释放 hls 实例与 video 元素，
+          // 否则测速结束后实例仍会在后台持续拉流，造成内存与带宽泄漏
+          cleanup();
           if (width && width > 0) {
-            hls.destroy();
-            video.remove();
-
             // 根据视频宽度判断视频质量等级，使用经典分辨率的宽度作为分割点
             const quality =
               width >= 3840
@@ -196,8 +207,7 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
         console.error('HLS错误:', data);
         if (data.fatal) {
           clearTimeout(timeout);
-          hls.destroy();
-          video.remove();
+          cleanup();
           reject(new Error(`HLS播放失败: ${data.type}`));
         }
       });

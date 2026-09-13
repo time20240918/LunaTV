@@ -106,7 +106,11 @@ export default async function RootLayout({
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.RUNTIME_CONFIG = ${JSON.stringify(runtimeConfig)};`,
+            // 转义 < 与分隔符，避免站点名/公告等配置内容中的 </script> 提前闭合脚本标签
+            __html: `window.RUNTIME_CONFIG = ${JSON.stringify(runtimeConfig)
+              .replace(/</g, '\\u003c')
+              .replace(/\u2028/g, '\\u2028')
+              .replace(/\u2029/g, '\\u2029')};`,
           }}
         />
       </head>

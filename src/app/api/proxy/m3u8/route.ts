@@ -27,8 +27,7 @@ export async function GET(request: Request) {
   let responseUsed = false;
 
   try {
-    const decodedUrl = decodeURIComponent(url);
-
+    const decodedUrl = url;
     response = await fetch(decodedUrl, {
       cache: 'no-cache',
       redirect: 'follow',
@@ -54,7 +53,7 @@ export async function GET(request: Request) {
       const baseUrl = getBaseUrl(finalUrl);
 
       // 重写 M3U8 内容
-      const modifiedContent = rewriteM3U8Content(m3u8Content, baseUrl, request, allowCORS);
+      const modifiedContent = rewriteM3U8Content(m3u8Content, baseUrl, allowCORS);
 
       const headers = new Headers();
       headers.set('Content-Type', contentType);
@@ -94,21 +93,10 @@ export async function GET(request: Request) {
   }
 }
 
-function rewriteM3U8Content(content: string, baseUrl: string, req: Request, allowCORS: boolean) {
-  // 从 referer 头提取协议信息
-  const referer = req.headers.get('referer');
-  let protocol = 'http';
-  if (referer) {
-    try {
-      const refererUrl = new URL(referer);
-      protocol = refererUrl.protocol.replace(':', '');
-    } catch (error) {
-      // ignore
-    }
-  }
-
-  const host = req.headers.get('host');
-  const proxyBase = `${protocol}://${host}/api/proxy`;
+function rewriteM3U8Content(content: string, baseUrl: string, allowCORS: boolean) {
+  // 使用站内相对路径，播放列表中的地址会相对于播放列表自身的 URL 解析。
+  // 这样既不依赖可伪造的 Host 头，也不会在 HTTPS 站点下拼出 http:// 造成混合内容被拦截。
+  const proxyBase = '/api/proxy';
 
   const lines = content.split('\n');
   const rewrittenLines: string[] = [];

@@ -10,12 +10,42 @@ import { SearchResult } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
+// 最小执行间隔：该任务会遍历所有用户的播放记录/收藏并请求上游，
+// 频繁触发会造成资源浪费，这里做一层节流与互斥，避免任务堆叠
+const MIN_INTERVAL_MS = 5 * 60 * 1000;
+let runningJob: Promise<void> | null = null;
+let lastRunAt = 0;
+
 export async function GET(request: NextRequest) {
   console.log(request.url);
   try {
     console.log('Cron job triggered:', new Date().toISOString());
 
-    cronJob();
+    if (runningJob) {
+      return NextResponse.json({
+        success: true,
+        message: 'Cron job already running, skipped',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const now = Date.now();
+    if (now - lastRunAt < MIN_INTERVAL_MS) {
+      return NextResponse.json({
+        success: true,
+        message: 'Cron job skipped, triggered too frequently',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    lastRunAt = now;
+    runningJob = cronJob()
+      .catch((err) => {
+        console.error('Cron job failed:', err);
+      })
+      .finally(() => {
+        runningJob = null;
+      });
 
     return NextResponse.json({
       success: true,
